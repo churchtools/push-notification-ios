@@ -355,7 +355,41 @@ static inline NSDictionary *RCTSettingsDictForUNNotificationSettings(BOOL alert,
 
 RCT_EXPORT_METHOD(presentLocalNotification:(UILocalNotification *)notification)
 {
-  [RCTSharedApplication() presentLocalNotificationNow:notification];
+    if (@available(iOS 10.0, *)) {
+        UNUserNotificationCenter *center = UNUserNotificationCenter.currentNotificationCenter;
+
+        UNMutableNotificationContent *content = [UNMutableNotificationContent new];
+        content.title = notification.alertTitle;
+        content.body = notification.alertBody;
+        content.userInfo = notification.userInfo;
+        if (![notification.soundName isEqualToString:@""]) {
+            content.sound = [UNNotificationSound defaultSound];
+            if (![notification.soundName isEqualToString:@"default"]) {
+                content.sound = [UNNotificationSound soundNamed:notification.soundName];
+            }
+        }
+        NSDictionary* userInfo = RCTJSONClean(content.userInfo);
+        if ([userInfo valueForKey:@"threadId"] != NULL) {
+            content.threadIdentifier = [userInfo valueForKey:@"threadId"];
+        }
+
+        NSUUID *uuid = [NSUUID UUID];
+        NSString *identifier = [uuid UUIDString];
+        if ([userInfo valueForKey:@"notificationId"] != NULL) {
+            identifier = [userInfo valueForKey:@"notificationId"];
+        }
+        
+        UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:identifier content:content trigger:NULL];
+
+        [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+            if (error != nil) {
+                NSLog(@"Something went wrong: %@",error);
+            }
+        }];
+    } else {
+        // Fallback on earlier versions
+        [RCTSharedApplication() presentLocalNotificationNow:notification];
+    }
 }
 
 RCT_EXPORT_METHOD(scheduleLocalNotification:(UILocalNotification *)notification)
